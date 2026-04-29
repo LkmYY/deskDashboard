@@ -24,6 +24,7 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 - 已初始化本地 Git 仓库，准备接入 GitHub 远端 `https://github.com/LkmYY/deskDashboard.git`。
 - 已新增 `.gitignore`，避免上传 `node_modules`、`dist`、日志、缓存和本地环境文件。
 - 已将 `README.md` 重写为干净的 UTF-8 中文文档，避免上传乱码文档污染远端。
+- 已将当前项目代码以非强推方式上传到 GitHub 远端 `main` 分支。
 
 ## 已验证
 
@@ -35,6 +36,7 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 - 选择 gpt 模型时，Runner 会被识别为 `codex-cli`。
 - 已确认 GitHub 远端 `main` 分支存在提交，上传前必须走合并/追加提交流程，不能强推覆盖。
 - `README.md` 已能作为项目入口说明，并链接到本进度文件。
+- GitHub 远端已更新到提交 `1bc3b1d`，包含当前 MVP 代码、进度文件和上传污染控制配置。
 
 ## 已知问题
 
@@ -47,14 +49,13 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 ## 下一步优先级
 
 1. 在真实 Git 项目上验证完整 Runner 流程。
-2. 将当前代码以非强推方式上传到 GitHub 远端。
-3. 将 run 状态持久化到 `~/.desk-dashboard/state.json` 或 SQLite。
-4. 增加 worktree 清理和安全放弃流程。
-5. 增加验收后接受、应用、合并改动的流程。
-6. 增加更完整的 diff 查看器和变更文件列表。
-7. 解析 Codex 执行 transcript，让日志更清晰。
-8. 增加非 gpt Agent 的 provider 抽象。
-9. 增加任务生命周期和 Runner API 的自动化测试。
+2. 将 run 状态持久化到 `~/.desk-dashboard/state.json` 或 SQLite。
+3. 增加 worktree 清理和安全放弃流程。
+4. 增加验收后接受、应用、合并改动的流程。
+5. 增加更完整的 diff 查看器和变更文件列表。
+6. 解析 Codex 执行 transcript，让日志更清晰。
+7. 增加非 gpt Agent 的 provider 抽象。
+8. 增加任务生命周期和 Runner API 的自动化测试。
 
 ## 安全规则
 

@@ -56,10 +56,13 @@ function runProcess(cwd, command, args, options = {}) {
 
     const child = spawn(command, args, {
       cwd,
-      shell: false,
+      shell: Boolean(options.shell),
       windowsHide: true
     });
     if (run) run.currentChild = child;
+    if (typeof options.input === "string" && child.stdin) {
+      child.stdin.end(options.input);
+    }
 
     let output = "";
     let settled = false;
@@ -140,7 +143,8 @@ function isGptModel(model) {
 
 function bin(name) {
   if (process.platform !== "win32") return name;
-  return name === "npm" || name === "codex" ? `${name}.cmd` : name;
+  if (name === "npm") return "npm.cmd";
+  return name;
 }
 
 function buildCodexPrompt(payload) {
@@ -154,6 +158,16 @@ function buildCodexPrompt(payload) {
     "",
     "请完成这个需求，并保持改动尽量小而清晰。"
   ].join("\n");
+}
+
+function buildCodexExecArgs(worktreePath, model) {
+  const args = ["exec", "--cd", worktreePath, "--sandbox", "workspace-write"];
+  const normalizedModel = String(model || "").toLowerCase();
+  if (normalizedModel && normalizedModel !== "gpt-default" && normalizedModel !== "gpt-auto") {
+    args.push("--model", model);
+  }
+  args.push("-");
+  return args;
 }
 
 async function startTaskRun(payload) {
@@ -223,9 +237,11 @@ async function startTaskRun(payload) {
         const codexResult = await runProcess(
           worktreePath,
           bin("codex"),
-          ["exec", "-C", worktreePath, "-m", model, "--sandbox", "workspace-write", "--ask-for-approval", "never", buildCodexPrompt(payload)],
+          buildCodexExecArgs(worktreePath, model),
           {
             timeoutMs: 600_000,
+            shell: process.platform === "win32",
+            input: buildCodexPrompt(payload),
             run,
             onLine: (line) => addRunLog(run, "agent", line)
           }

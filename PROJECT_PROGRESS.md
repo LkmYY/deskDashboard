@@ -36,7 +36,7 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 - 选择 gpt 模型时，Runner 会被识别为 `codex-cli`。
 - 已确认 GitHub 远端 `main` 分支存在提交，上传前必须走合并/追加提交流程，不能强推覆盖。
 - `README.md` 已能作为项目入口说明，并链接到本进度文件。
-- GitHub 远端已更新到提交 `28949dc`，包含当前 MVP 代码、进度文件和上传污染控制配置。
+- GitHub 远端 `main` 已包含当前 MVP 代码、进度文件和上传污染控制配置；最新提交以 `git log --oneline -1` 为准。
 
 ## 已知问题
 

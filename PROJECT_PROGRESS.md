@@ -31,7 +31,8 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
   - 记录 Codex CLI 版本、命中路径、旧 npm shim 提醒和模型失败原因。
   - 详情页新增 Runner 自检面板，直接展示原因和处理建议。
 - 已改进隔离 worktree 的构建策略：如果 worktree 中没有 `node_modules`，跳过自动 build 并记录原因，避免 Runner 隐式安装依赖。
-- 已完成 Runner 日志、耗时、worktree 路径、分支、diff stat 和 diff 展示。
+- 已完成 Runner 日志、耗时、worktree 路径、分支、diff stat、变更文件列表和 diff 展示。
+- 已增强 diff 收集：未跟踪文本文件会进入 `changedFiles`，并在 diff 面板中展示文件名和内容预览；二进制或过大文件只展示提示。
 - 已初始化本地 Git 仓库，准备接入 GitHub 远端 `https://github.com/LkmYY/deskDashboard.git`。
 - 已新增 `.gitignore`，避免上传 `node_modules`、`dist`、日志、缓存和本地环境文件。
 - 已将 `README.md` 重写为干净的 UTF-8 中文文档，避免上传乱码文档污染远端。
@@ -58,7 +59,6 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 
 ## 已知问题
 
-- `git diff` 当前不会展示未跟踪文件内容；真实 smoke 中 `RUNNER_SMOKE_TEST.md` 以 `?? RUNNER_SMOKE_TEST.md` 出现在状态日志里，但 diff 面板内容为空。
 - 当前 PATH 仍存在 `C:\Users\Dell\AppData\Roaming\npm\codex.cmd`，Runner 自检会提示旧 npm shim 风险；本次实际检测到的 Codex CLI 版本为 `0.125.0`。
 - in-app browser 自动化仍可能解析到旧 Node 路径，nvm 更新后可能需要重启 Codex。
 - Runner 状态目前保存在内存中，应用状态保存在 JSON 中；API 重启后 run 记录不会持久保留。
@@ -67,15 +67,14 @@ Desk Dashboard 已经从一个本地项目看板 MVP，推进到带有真实 Run
 
 ## 下一步优先级
 
-1. 增强 diff 收集：把未跟踪文件加入 diff 展示，至少展示文件名和文本预览。
-2. 将 run 状态持久化到 `~/.desk-dashboard/state.json` 或 SQLite。
-3. 增加 worktree 清理和安全放弃流程。
-4. 增加验收后接受、应用、合并改动的流程。
-5. 增加更完整的 diff 查看器和变更文件列表。
-6. 修复本机 Codex CLI 路径选择：优先使用新版 OpenAI Codex CLI，避免 PATH 命中旧 `npm` shim。
-7. 解析 Codex 执行 transcript，让日志更清晰。
-8. 增加非 gpt Agent 的 provider 抽象。
-9. 增加任务生命周期和 Runner API 的自动化测试。
+1. 将 run 状态持久化到 `~/.desk-dashboard/state.json` 或 SQLite。
+2. 增加 worktree 清理和安全放弃流程。
+3. 增加验收后接受、应用、合并改动的流程。
+4. 增加更完整的 diff 查看器：按文件切换、折叠大文件、区分新增/修改/删除。
+5. 修复本机 Codex CLI 路径选择：优先使用新版 OpenAI Codex CLI，避免 PATH 命中旧 `npm` shim。
+6. 解析 Codex 执行 transcript，让日志更清晰。
+7. 增加非 gpt Agent 的 provider 抽象。
+8. 增加任务生命周期和 Runner API 的自动化测试。
 
 ## 安全规则
 

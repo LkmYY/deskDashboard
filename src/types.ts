@@ -68,6 +68,15 @@ export interface TaskRun {
       reason: string;
     };
   };
+  changedFiles?: Array<{
+    path: string;
+    status: string;
+    tracked: boolean;
+    preview: string;
+    binary: boolean;
+    truncated: boolean;
+    size: number;
+  }>;
   diffStat: string;
   diff: string;
   error?: string;

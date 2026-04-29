@@ -923,7 +923,16 @@ function App() {
           {selectedRun && (
             <section className="diff-panel">
               <h3>文件改动</h3>
-              <pre>{selectedRun.diffStat || selectedRun.diff || "暂未检测到文件改动"}</pre>
+              {selectedRun.changedFiles && selectedRun.changedFiles.length > 0 && (
+                <div className="changed-files">
+                  {selectedRun.changedFiles.map((file) => (
+                    <span key={`${file.status}-${file.path}`}>
+                      {file.status.trim() || "??"} {file.path}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <pre>{selectedRun.diff || selectedRun.diffStat || "暂未检测到文件改动"}</pre>
             </section>
           )}
         </>

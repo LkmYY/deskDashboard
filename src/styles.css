@@ -927,6 +927,26 @@ button {
   white-space: pre-wrap;
 }
 
+.changed-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(23, 32, 27, 0.08);
+}
+
+.changed-files span {
+  max-width: 100%;
+  padding: 5px 9px;
+  border: 1px solid rgba(23, 32, 27, 0.1);
+  border-radius: 999px;
+  overflow-wrap: anywhere;
+  background: rgba(255, 255, 255, 0.62);
+  color: #3f4a42;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+}
+
 .logs {
   display: flex;
   flex-direction: column;

@@ -35,12 +35,96 @@ async function pathExists(filePath) {
   }
 }
 
+async function readTextPreview(filePath, maxBytes = 20_000) {
+  const stat = await fs.stat(filePath);
+  if (stat.size > maxBytes) {
+    return { text: "", truncated: true, binary: false, size: stat.size };
+  }
+
+  const buffer = await fs.readFile(filePath);
+  const binary = buffer.includes(0);
+  if (binary) {
+    return { text: "", truncated: false, binary: true, size: stat.size };
+  }
+
+  return {
+    text: buffer.toString("utf8"),
+    truncated: false,
+    binary: false,
+    size: stat.size
+  };
+}
+
 function runGit(cwd, args) {
   return new Promise((resolve) => {
     execFile("git", args, { cwd, timeout: 5000 }, (error, stdout) => {
       resolve(error ? "" : stdout.trim());
     });
   });
+}
+
+function parseGitStatusLine(line) {
+  const status = line.slice(0, 2);
+  let filePath = line.slice(3).trim();
+  const renameIndex = filePath.indexOf(" -> ");
+  if (renameIndex >= 0) filePath = filePath.slice(renameIndex + 4).trim();
+  return { status, path: filePath };
+}
+
+async function collectChangedFiles(worktreePath, statusText) {
+  const files = [];
+  for (const line of String(statusText || "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    const item = parseGitStatusLine(line);
+    const file = {
+      path: item.path,
+      status: item.status,
+      tracked: item.status !== "??",
+      preview: "",
+      binary: false,
+      truncated: false,
+      size: 0
+    };
+
+    if (item.status === "??") {
+      try {
+        const preview = await readTextPreview(path.join(worktreePath, item.path));
+        file.preview = preview.text;
+        file.binary = preview.binary;
+        file.truncated = preview.truncated;
+        file.size = preview.size;
+      } catch (error) {
+        file.preview = error instanceof Error ? error.message : "无法读取文件预览";
+      }
+    }
+
+    files.push(file);
+  }
+  return files;
+}
+
+function buildDiffReport(diffStat, diff, changedFiles) {
+  const sections = [];
+  if (diffStat) sections.push(diffStat);
+  if (diff) sections.push(diff);
+
+  const untracked = changedFiles.filter((file) => !file.tracked);
+  for (const file of untracked) {
+    const header = [
+      `--- 未跟踪文件：${file.path}`,
+      `状态：${file.status.trim() || "??"}，大小：${file.size} bytes`
+    ];
+    if (file.binary) {
+      header.push("预览：二进制文件，已跳过内容展示。");
+    } else if (file.truncated) {
+      header.push("预览：文件过大，已跳过内容展示。");
+    } else {
+      header.push("预览：", file.preview || "(空文件)");
+    }
+    sections.push(header.join("\n"));
+  }
+
+  return sections.join("\n\n");
 }
 
 function runProcess(cwd, command, args, options = {}) {
@@ -280,6 +364,7 @@ async function startTaskRun(payload) {
     startedAt: new Date(started).toISOString(),
     logs: [],
     diagnostics: {},
+    changedFiles: [],
     diffStat: "",
     diff: ""
   };
@@ -387,6 +472,8 @@ async function startTaskRun(payload) {
       run.diffStat = await runGit(worktreePath, ["diff", "--stat"]);
       run.diff = await runGit(worktreePath, ["diff", "--"]);
       const finalStatus = await runGit(worktreePath, ["status", "--short"]);
+      run.changedFiles = await collectChangedFiles(worktreePath, finalStatus);
+      run.diff = buildDiffReport(run.diffStat, run.diff, run.changedFiles);
 
       if (finalStatus) {
         addRunLog(run, "change", finalStatus);

@@ -856,6 +856,49 @@ function App() {
             </section>
           )}
 
+          {selectedRun?.diagnostics?.codex && (
+            <section className={`diagnostic-panel ${selectedRun.status === "failed" ? "is-warning" : ""}`}>
+              <h3>
+                <AlertCircle size={16} />
+                Runner 自检
+              </h3>
+              <dl>
+                <div>
+                  <dt>Codex</dt>
+                  <dd>{selectedRun.diagnostics.codex.version || "版本未知"}</dd>
+                </div>
+                <div>
+                  <dt>路径</dt>
+                  <dd>{selectedRun.diagnostics.codex.paths.join(" | ") || "未检测到"}</dd>
+                </div>
+                {selectedRun.diagnostics.codex.warnings.length > 0 && (
+                  <div>
+                    <dt>提醒</dt>
+                    <dd>{selectedRun.diagnostics.codex.warnings.join("；")}</dd>
+                  </div>
+                )}
+                {selectedRun.diagnostics.codexFailure && (
+                  <>
+                    <div>
+                      <dt>原因</dt>
+                      <dd>{selectedRun.diagnostics.codexFailure.summary}</dd>
+                    </div>
+                    <div>
+                      <dt>处理</dt>
+                      <dd>{selectedRun.diagnostics.codexFailure.action}</dd>
+                    </div>
+                  </>
+                )}
+                {selectedRun.diagnostics.build?.skipped && (
+                  <div>
+                    <dt>构建</dt>
+                    <dd>{selectedRun.diagnostics.build.reason}</dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
+
           <section className="plan-panel">
             <h3>计划方案</h3>
             <ol>

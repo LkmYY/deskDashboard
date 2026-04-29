@@ -48,6 +48,26 @@ export interface TaskRun {
   finishedAt?: string;
   elapsedMs?: number;
   logs: TaskLog[];
+  diagnostics?: {
+    codex?: {
+      command: string;
+      version: string;
+      paths: string[];
+      exitCode: number;
+      ok: boolean;
+      warnings: string[];
+      raw: string;
+    };
+    codexFailure?: {
+      code: string;
+      summary: string;
+      action: string;
+    };
+    build?: {
+      skipped: boolean;
+      reason: string;
+    };
+  };
   diffStat: string;
   diff: string;
   error?: string;

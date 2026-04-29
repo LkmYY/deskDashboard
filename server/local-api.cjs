@@ -99,6 +99,20 @@ function runProcess(cwd, command, args, options = {}) {
   });
 }
 
+function runCapture(cwd, command, args, options = {}) {
+  const lines = [];
+  return runProcess(cwd, command, args, {
+    timeoutMs: options.timeoutMs || 15_000,
+    shell: options.shell,
+    input: options.input,
+    onLine: (line) => lines.push(line)
+  }).then((result) => ({
+    ...result,
+    lines,
+    text: lines.join("\n")
+  }));
+}
+
 function makeLog(taskId, kind, message) {
   return {
     id: `log-${crypto.randomUUID()}`,
@@ -170,6 +184,82 @@ function buildCodexExecArgs(worktreePath, model) {
   return args;
 }
 
+function extractCodexVersion(text) {
+  const match = String(text || "").match(/codex(?:-cli)?\s+([0-9][^\s]*)/i);
+  return match ? match[1] : "";
+}
+
+function parseCodexFailure(text) {
+  const raw = String(text || "");
+  if (/requires a newer version of Codex/i.test(raw)) {
+    return {
+      code: "codex-outdated",
+      summary: "当前命中的 Codex CLI 版本过旧，无法使用账号默认模型。",
+      action: "请升级或修正 PATH，让 Runner 命中新版 Codex CLI 后重试。"
+    };
+  }
+  const unsupported = raw.match(/The '([^']+)' model is not supported/i);
+  if (unsupported) {
+    return {
+      code: "model-unsupported",
+      summary: `当前 Codex 账号或 CLI 不支持模型 ${unsupported[1]}。`,
+      action: "请改用账号可用模型，或使用 gpt-default 让 Codex CLI 选择默认模型。"
+    };
+  }
+  if (/spawn EPERM|Access is denied/i.test(raw)) {
+    return {
+      code: "spawn-denied",
+      summary: "Windows 拒绝直接启动 Codex CLI。",
+      action: "请使用 shell 启动或修正 Codex CLI 路径，避免直接 spawn WindowsApps 应用别名。"
+    };
+  }
+  if (/unexpected argument/i.test(raw)) {
+    return {
+      code: "cli-args",
+      summary: "Codex CLI 参数与当前版本不兼容。",
+      action: "请使用当前 CLI 支持的 exec 参数，并通过 stdin 传入多行 prompt。"
+    };
+  }
+  return {
+    code: "codex-failed",
+    summary: "Codex CLI 执行失败。",
+    action: "请查看下方日志中的 stderr，确认账号、网络、模型和 CLI 版本。"
+  };
+}
+
+async function inspectCodexCli(cwd) {
+  const shell = process.platform === "win32";
+  const versionResult = await runCapture(cwd, bin("codex"), ["--version"], {
+    shell,
+    timeoutMs: 20_000
+  });
+  const pathCommand = process.platform === "win32" ? "cmd.exe" : "sh";
+  const pathArgs = process.platform === "win32" ? ["/d", "/s", "/c", "where codex"] : ["-lc", "command -v codex"];
+  const pathResult = await runCapture(cwd, pathCommand, pathArgs, { timeoutMs: 20_000 });
+  const paths = pathResult.lines
+    .map((line) => line.replace(/^(stdout|stderr):\s*/, "").trim())
+    .filter(Boolean);
+  const version = extractCodexVersion(versionResult.text);
+  const warnings = [];
+
+  if (version && /^0\.(?:[0-9]|[1-9][0-9])\./.test(version)) {
+    warnings.push("当前 Codex CLI 版本较旧，可能不支持最新模型。");
+  }
+  if (paths.some((item) => /AppData\\Roaming\\npm\\codex\.cmd/i.test(item))) {
+    warnings.push("PATH 中存在旧的 npm codex shim，可能会优先命中旧 CLI。");
+  }
+
+  return {
+    command: "codex",
+    version,
+    paths,
+    exitCode: versionResult.code,
+    ok: versionResult.code === 0,
+    warnings,
+    raw: versionResult.text
+  };
+}
+
 async function startTaskRun(payload) {
   const started = Date.now();
   const model = payload.model || "gpt-5.4-codex";
@@ -189,6 +279,7 @@ async function startTaskRun(payload) {
     status: "running",
     startedAt: new Date(started).toISOString(),
     logs: [],
+    diagnostics: {},
     diffStat: "",
     diff: ""
   };
@@ -233,6 +324,15 @@ async function startTaskRun(payload) {
       addRunLog(run, "event", `隔离环境已创建：${worktreePath}`);
 
       if (agent === "codex-cli") {
+        run.diagnostics.codex = await inspectCodexCli(worktreePath);
+        if (run.diagnostics.codex.ok) {
+          addRunLog(run, "agent", `Codex CLI preflight passed: ${run.diagnostics.codex.version || "unknown version"}`);
+        } else {
+          addRunLog(run, "error", "Codex CLI preflight failed: version command did not complete");
+        }
+        for (const warning of run.diagnostics.codex.warnings || []) {
+          addRunLog(run, "error", warning);
+        }
         addRunLog(run, "agent", `使用本地 Codex CLI 执行：${model}`);
         const codexResult = await runProcess(
           worktreePath,
@@ -249,6 +349,9 @@ async function startTaskRun(payload) {
 
         if (run.cancelRequested) throw new Error("任务已停止");
         if (codexResult.code !== 0) {
+          run.diagnostics.codexFailure = parseCodexFailure(codexResult.output);
+          addRunLog(run, "error", run.diagnostics.codexFailure.summary);
+          addRunLog(run, "error", run.diagnostics.codexFailure.action);
           throw new Error("Codex CLI 执行失败");
         }
       } else {
@@ -257,15 +360,24 @@ async function startTaskRun(payload) {
 
       const scripts = await readPackageScripts(worktreePath);
       if (scripts.build) {
+        if (!(await pathExists(path.join(worktreePath, "node_modules")))) {
+          run.diagnostics.build = {
+            skipped: true,
+            reason: "隔离 worktree 中没有 node_modules，跳过自动 build，避免在 Runner 中隐式安装依赖。"
+          };
+          addRunLog(run, "command", run.diagnostics.build.reason);
+        } else {
         addRunLog(run, "command", "检测到 build 脚本，开始执行 npm run build");
         const buildResult = await runProcess(worktreePath, bin("npm"), ["run", "build"], {
           timeoutMs: 180_000,
+          shell: process.platform === "win32",
           run,
           onLine: (line) => addRunLog(run, "command", line)
         });
         if (run.cancelRequested) throw new Error("任务已停止");
         if (buildResult.code !== 0) {
           throw new Error("npm run build 执行失败");
+        }
         }
       } else {
         addRunLog(run, "event", "未检测到 package.json build 脚本，本次跳过自动构建验证");
